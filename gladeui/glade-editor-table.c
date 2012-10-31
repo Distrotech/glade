@@ -268,6 +268,33 @@ glade_editor_table_update_show_template (GladeEditable *editable, gboolean load)
 }
 
 static void
+refresh_names_width (GladeEditorTable *table)
+{
+  GladeEditorTablePrivate *priv = table->priv;
+  gint i, width = 0, widthest = 0;
+  GList *l;
+  
+  for (i = 0, l = priv->properties; l; l = g_list_next (l), i++)
+    {
+      GladePropertyClass *pclass = glade_editor_property_get_pclass (l->data);
+      gint w;
+
+      w = strlen (glade_property_class_get_name (pclass));
+      if (w > widthest) widthest = w;
+      width += w;
+    }
+
+  if (priv->properties)
+    {
+      gint average = width / i;
+      gint max = (widthest-average)/3 + average;
+
+      for (l = priv->properties; l; l = g_list_next (l))
+        glade_editor_property_label_set_width_chars (l->data, average, max);
+    }
+}
+
+static void
 glade_editor_table_load (GladeEditable * editable, GladeWidget * widget)
 {
   GladeEditorTable *table = GLADE_EDITOR_TABLE (editable);
@@ -279,6 +306,8 @@ glade_editor_table_load (GladeEditable * editable, GladeWidget * widget)
   if (priv->loaded_widget == widget)
     return;
 
+  refresh_names_width (table);
+  
   if (priv->loaded_widget)
     {
       g_signal_handlers_disconnect_by_func (G_OBJECT (priv->loaded_widget),

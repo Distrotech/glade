@@ -177,6 +177,18 @@ glade_editor_property_loading (GladeEditorProperty *eprop)
   return eprop->priv->loading;
 }
 
+
+void
+glade_editor_property_label_set_width_chars (GladeEditorProperty *eprop,
+                                             gint width,
+                                             gint max_width)
+{
+  g_return_if_fail (GLADE_IS_EDITOR_PROPERTY (eprop));
+
+  gtk_label_set_width_chars (GTK_LABEL (eprop->priv->label), width);
+  gtk_label_set_max_width_chars (GTK_LABEL (eprop->priv->label), max_width);
+}
+
 static void
 glade_editor_property_tooltip_cb (GladeProperty *property,
                                   const gchar *tooltip,
@@ -354,6 +366,7 @@ glade_editor_property_constructor (GType type,
 
   gtk_label_set_line_wrap (GTK_LABEL (eprop->priv->label), TRUE);
   gtk_label_set_width_chars (GTK_LABEL (eprop->priv->label), 10);
+  gtk_widget_set_halign (eprop->priv->label, GTK_ALIGN_START);
   gtk_label_set_line_wrap_mode (GTK_LABEL (eprop->priv->label), PANGO_WRAP_WORD_CHAR);
 
   gtk_misc_set_alignment (GTK_MISC (eprop->priv->label), 0.0, 0.5);

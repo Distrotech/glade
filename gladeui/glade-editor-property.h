@@ -116,6 +116,10 @@ GladePropertyClass  *glade_editor_property_get_pclass      (GladeEditorProperty 
 GladeProperty       *glade_editor_property_get_property    (GladeEditorProperty *eprop);
 gboolean             glade_editor_property_loading         (GladeEditorProperty *eprop);
 
+void                 glade_editor_property_label_set_width_chars (GladeEditorProperty *eprop,
+                                                                  gint width,
+                                                                  gint max_width);
+
 gboolean             glade_editor_property_show_i18n_dialog (GtkWidget            *parent,
 							     gchar               **text,
 							     gchar               **context,
