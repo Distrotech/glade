@@ -1056,6 +1056,60 @@ draw_margin_selection (cairo_t *cr,
 }
 
 static inline void
+draw_container_wireframe (cairo_t *cr,
+                          GtkWidget *parent,
+                          GtkWidget *widget,
+                          GdkRGBA *color)
+{
+  GladeWidget *gwidget = glade_widget_get_from_gobject (widget);
+  GladeWidget *gcontainer = glade_widget_get_parent (gwidget);
+  GtkWidget *container = GTK_WIDGET (glade_widget_get_object (gcontainer));
+  GList *l, *children;
+
+  if (!(GTK_IS_BOX (container) ||
+        GTK_IS_GRID (container) ||
+        GTK_IS_TABLE (container) ||
+        GTK_IS_MENU_SHELL (container) ||
+        GTK_IS_TOOLBAR (container)))
+    return;
+
+  children = gtk_container_get_children (GTK_CONTAINER (container));
+  /* Append a rectangle to path for each children */
+  for (l = children; l; l = g_list_next (l))
+    {
+      GtkWidget *child = l->data;
+      gint x, y, border, l, t;
+      GtkAllocation alloc;
+
+      if (!gtk_widget_get_visible (child))
+        continue;
+
+      gtk_widget_get_allocation (child, &alloc);
+      gtk_widget_translate_coordinates (child, parent, 0, 0, &x, &y);
+
+      /* Add margins to allocation */
+      x -= (l = gtk_widget_get_margin_left (child));
+      y -= (t = gtk_widget_get_margin_top (child));
+      alloc.width += gtk_widget_get_margin_right (child) + l;
+      alloc.height += gtk_widget_get_margin_bottom (child) + t;
+
+      /* Add border if its a container */
+      if (GTK_IS_CONTAINER (child) &&
+          (border = gtk_container_get_border_width (GTK_CONTAINER (child))))
+        cairo_rectangle (cr, x - border, y - border,
+                         alloc.width + border + border, 
+                         alloc.height + border + border);
+      else
+        cairo_rectangle (cr, x, y, alloc.width, alloc.height);
+    }
+
+  cairo_set_source_rgba (cr, color->red, color->green, color->blue, .64);
+  cairo_stroke (cr);
+
+  g_list_free (children);
+}
+
+static inline void
 draw_selection (cairo_t *cr,
                 GtkWidget *parent,
                 GtkWidget *widget,
@@ -1470,6 +1524,7 @@ glade_design_layout_draw (GtkWidget *widget, cairo_t *cr)
                   if (GTK_IS_WIDGET (selection) && 
                       gtk_widget_is_ancestor (selection, child))
                   {
+                    draw_container_wireframe (cr, widget, selection, &priv->frame_color_active[0]);
                     draw_selection (cr, widget, selection, &priv->frame_color_active[0]);
                     selected = TRUE;
                   }
