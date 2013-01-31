@@ -1171,7 +1171,7 @@ glade_property_write (GladeProperty * property,
   /* This code should work the same for <packing>, <widget> and <template> */
   if (!(glade_xml_node_verify_silent (node, GLADE_XML_TAG_PACKING) ||
         glade_xml_node_verify_silent (node, GLADE_XML_TAG_WIDGET) ||
-        glade_xml_node_verify_silent (node, GLADE_XML_TAG_TEMPLATE)))
+        glade_xml_node_verify_silent (node, GLADE_XML_TAG_EXTERNAL_OBJECT)))
     return;
 
   /* Skip properties that are default by original pspec default

@@ -44,7 +44,7 @@ start_element (GMarkupParseContext  *context,
 {
   ParseData *state = user_data;
 
-  if (g_strcmp0 (element_name, "template") == 0)
+  if (g_strcmp0 (element_name, GLADE_XML_TAG_EXTERNAL_OBJECT) == 0)
     {
       gint i;
 

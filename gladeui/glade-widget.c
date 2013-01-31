@@ -3788,7 +3788,7 @@ glade_widget_read (GladeProject * project,
   if (glade_project_load_cancelled (project))
     return NULL;
 
-  is_tmpl = (parent == NULL && glade_xml_node_verify_silent (node, GLADE_XML_TAG_TEMPLATE));
+  is_tmpl = (parent == NULL && glade_xml_node_verify_silent (node, GLADE_XML_TAG_EXTERNAL_OBJECT));
 
   if (!is_tmpl && !glade_xml_node_verify_silent (node, GLADE_XML_TAG_WIDGET))
     return NULL;
@@ -3997,7 +3997,7 @@ glade_widget_write (GladeWidget * widget,
       return;
     }
 
-  widget_node = glade_xml_node_new (context, (tmpl) ? GLADE_XML_TAG_TEMPLATE : GLADE_XML_TAG_WIDGET);
+  widget_node = glade_xml_node_new (context, (tmpl) ? GLADE_XML_TAG_EXTERNAL_OBJECT : GLADE_XML_TAG_WIDGET);
   glade_xml_node_append_child (node, widget_node);
 
   /* Set class and id */
