@@ -292,16 +292,25 @@ glade_composite_template_save_from_widget (GladeWidget *gwidget,
       GladeProject *project = glade_widget_get_project (gwidget);
       GladeWidget *parent = glade_widget_get_parent (gwidget);
       GladeWidgetAdaptor *new_adaptor;
+      GladeWidget *new_widget;
       GList widgets = {0, };
       
       /* Create it at run time */
       if ((new_adaptor = glade_composite_template_load_from_string (template_xml)))
         g_object_set (new_adaptor, "template-path", filename, NULL);
 
+      new_widget = glade_widget_adaptor_create_widget (new_adaptor, FALSE,
+                                                       "parent", parent,
+                                                       "project", project,
+                                                       "reason", GLADE_CREATE_REBUILD,
+                                                       NULL);
+      glade_widget_copy_properties (new_widget, gwidget, FALSE, FALSE);
+      
       glade_command_push_group (_("Create new composite type %s"), template_class);
       widgets.data = gwidget;
-      glade_command_cut (&widgets);
-      glade_command_create (new_adaptor, parent, NULL, project);
+      glade_command_delete (&widgets);
+      widgets.data = new_widget;
+      glade_command_add (&widgets, parent, NULL, project, FALSE);
       glade_command_pop_group ();
     }
   
