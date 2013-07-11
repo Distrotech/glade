@@ -4887,3 +4887,24 @@ glade_widget_get_packing_properties (GladeWidget *widget)
 
   return widget->priv->packing_properties;
 }
+
+/**
+ * glade_widget_get_child_at_position:
+ * @x: x position in @widget coordinates
+ * @y: y position in @widget coordinates
+ * 
+ * Returns: The widget found at position @x @y or NULL.
+ */
+GtkWidget *
+glade_widget_get_child_at_position  (GladeWidget *widget, gint x, gint y)
+{
+  GladeWidgetPrivate *priv;
+
+  g_return_val_if_fail (GLADE_IS_WIDGET (widget), NULL);
+  priv = widget->priv;
+  g_return_val_if_fail (GTK_IS_WIDGET (priv->object), NULL);
+
+  return glade_widget_adaptor_get_child_at_position (priv->adaptor,
+                                                     GTK_WIDGET (priv->object),
+                                                     x, y);
+}

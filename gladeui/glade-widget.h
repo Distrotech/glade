@@ -220,6 +220,10 @@ gboolean                glade_widget_depends                (GladeWidget      *w
 
 GdkDevice              *glade_widget_get_device_from_event  (GdkEvent *event);
 
+GtkWidget              *glade_widget_get_child_at_position  (GladeWidget *widget,
+                                                             gint         x,
+                                                             gint         y);
+
 /*******************************************************************************
                       Project, object property references
  *******************************************************************************/

@@ -571,6 +571,24 @@ typedef gchar   *(* GladeStringFromValueFunc) (GladeWidgetAdaptor *adaptor,
 typedef GladeEditable *(* GladeCreateEditableFunc) (GladeWidgetAdaptor   *adaptor,
 						    GladeEditorPageType   type);
 
+/**
+ * GladeGetChildAtPositionFunc:
+ * @adaptor: A #GladeWidgetAdaptor
+ * @widget: A #GtkWidget
+ * @x: x position in @widget allocation coordinates
+ * @y: y position in @widget allocation coordinates
+ * 
+ * If @widget is a container it will return the child at the position @x @y that has
+ * an assosiated #GladeWidget or is a #GladePlaceholder otherwise it will return 
+ * @widget if the coordinates are inside its allocation.
+ *
+ * Returns: The widget found at position @x @y or NULL.
+ */
+typedef GtkWidget *(* GladeGetChildAtPositionFunc) (GladeWidgetAdaptor *adaptor,
+                                                    GtkWidget          *widget,
+                                                    gint                x,
+                                                    gint                y);
+
 
 /* Note that everything that must be processed at the creation of
  * every instance is managed on the instance structure, and everywhere
@@ -681,13 +699,14 @@ struct _GladeWidgetAdaptorClass
 
   GladeDestroyObjectFunc       destroy_object;    /* Object destructor */
   GladeWriteWidgetFunc         write_widget_after;/* Writes widget attributes to the xml (after children) */
-    
+
+  GladeGetChildAtPositionFunc  get_child_at_position;
+
   void   (* glade_reserved1)   (void);
   void   (* glade_reserved2)   (void);
   void   (* glade_reserved3)   (void);
   void   (* glade_reserved4)   (void);
   void   (* glade_reserved5)   (void);
-  void   (* glade_reserved6)   (void);
 };
 
 #define glade_widget_adaptor_create_widget(adaptor, query, ...) \
@@ -870,6 +889,11 @@ GladeSignalClass     *glade_widget_adaptor_get_signal_class   (GladeWidgetAdapto
 GladeWidgetAdaptor   *glade_widget_adaptor_get_parent_adaptor (GladeWidgetAdaptor *adaptor);
 
 gboolean              glade_widget_adaptor_has_internal_children (GladeWidgetAdaptor *adaptor);
+
+GtkWidget            *glade_widget_adaptor_get_child_at_position (GladeWidgetAdaptor *adaptor,
+                                                                  GtkWidget          *widget,
+                                                                  gint                x,
+                                                                  gint                y);
 
 G_END_DECLS
 

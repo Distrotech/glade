@@ -297,6 +297,20 @@ glade_widget_adaptor_has_internal_children (GladeWidgetAdaptor *adaptor)
   return adaptor->priv->internal_children != NULL;
 }
 
+GtkWidget *
+glade_widget_adaptor_get_child_at_position (GladeWidgetAdaptor *adaptor,
+                                            GtkWidget          *widget,
+                                            gint                x,
+                                            gint                y)
+{
+  g_return_val_if_fail (GLADE_IS_WIDGET_ADAPTOR (adaptor), NULL);
+  g_return_val_if_fail (GTK_IS_WIDGET (widget), NULL);
+
+  return GLADE_WIDGET_ADAPTOR_GET_CLASS (adaptor)->get_child_at_position (adaptor,
+                                                                          widget,
+                                                                          x, y);
+}
+
 static gint
 gwa_signal_comp (gpointer a, gpointer b)
 {
@@ -1356,6 +1370,78 @@ glade_widget_adaptor_object_get_children (GladeWidgetAdaptor *adaptor,
   return children;
 }
 
+typedef struct
+{
+  GtkWidget *toplevel;
+  GtkWidget *child;
+  gint x, y;
+} FindInContainerData;
+
+static void
+gwa_find_inside_container (GtkWidget *widget, FindInContainerData *data)
+{
+  gint x, y, w, h;
+
+  if (data->child || !gtk_widget_get_mapped (widget))
+    return;
+
+  gtk_widget_translate_coordinates (data->toplevel, widget, data->x, data->y,
+                                    &x, &y);
+  
+  /* Margins are not part of the widget allocation */
+  w = gtk_widget_get_allocated_width (widget) + gtk_widget_get_margin_right (widget);
+  h = gtk_widget_get_allocated_height (widget) + gtk_widget_get_margin_bottom (widget);
+
+  if (x >= (0 - gtk_widget_get_margin_left (widget)) && x < w &&
+      y >= (0 - gtk_widget_get_margin_top (widget)) && y < h)
+    {
+      if (GLADE_IS_PLACEHOLDER (widget))
+        data->child = widget;
+      else
+        {
+          GladeWidget *gwidget = glade_widget_get_from_gobject (widget);
+
+          if (GTK_IS_CONTAINER (widget))
+            {
+              if (gwidget)
+                data->child = glade_widget_get_child_at_position (gwidget, x, y);
+              else
+                gtk_container_forall (GTK_CONTAINER (widget),
+                                      (GtkCallback) gwa_find_inside_container,
+                                      data);
+            }
+          
+          if (!data->child && gwidget)
+            data->child = widget;
+        }
+    }
+}
+
+static GtkWidget *
+glade_widget_adaptor_object_get_child_at_position (GladeWidgetAdaptor *adaptor,
+                                                   GtkWidget          *widget,
+                                                   gint                x,
+                                                   gint                y)
+{
+  if (!gtk_widget_get_mapped (widget))
+    return NULL;
+
+  if (x >= 0 && x <= gtk_widget_get_allocated_width (widget) &&
+      y >= 0 && y <= gtk_widget_get_allocated_height (widget))
+    {
+      if (GTK_IS_CONTAINER (widget))
+        {
+          FindInContainerData data = {widget, NULL, x, y};
+          gtk_container_forall (GTK_CONTAINER (widget),
+                                (GtkCallback) gwa_find_inside_container,
+                                &data);
+
+          return (data.child) ? data.child : widget;
+        }
+      return widget;
+    }
+  return NULL;
+}
 
 /*******************************************************************************
             GladeWidgetAdaptor type registration and class initializer
@@ -1411,6 +1497,7 @@ glade_widget_adaptor_class_init (GladeWidgetAdaptorClass *adaptor_class)
   adaptor_class->create_eprop = glade_widget_adaptor_object_create_eprop;
   adaptor_class->string_from_value = glade_widget_adaptor_object_string_from_value;
   adaptor_class->create_editable = glade_widget_adaptor_object_create_editable;
+  adaptor_class->get_child_at_position = glade_widget_adaptor_object_get_child_at_position;
 
   /* Base defaults here */
   adaptor_class->toplevel = FALSE;
@@ -1640,6 +1727,10 @@ gwa_extend_with_node_load_sym (GladeWidgetAdaptorClass *klass,
                                     &symbol))
     klass->create_editable = symbol;
 
+  if (glade_xml_load_sym_from_node (node, module,
+                                    GLADE_TAG_GET_CHILD_AT_POSITION_FUNCTION,
+                                    &symbol))
+    klass->get_child_at_position = symbol;
 }
 
 static void
