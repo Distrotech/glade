@@ -57,6 +57,7 @@
 #include "glade-widget-action.h"
 #include "glade-signal-model.h"
 #include "glade-object-stub.h"
+#include "glade-dnd.h"
 
 static void glade_widget_set_adaptor (GladeWidget * widget,
                                       GladeWidgetAdaptor * adaptor);
@@ -161,6 +162,10 @@ struct _GladeWidgetPrivate {
 				   */
   guint              rebuilding : 1;
   guint              composite : 1;
+
+  /* GladeDrag */
+  gboolean drag_dest : 1;
+  guint drag_highlight : 1;
 };
 
 enum
@@ -195,6 +200,7 @@ enum
   PROP_SUPPORT_WARNING,
   PROP_VISIBLE,
   PROP_COMPOSITE,
+  PROP_DRAG_DEST,
   N_PROPERTIES
 };
 
@@ -203,7 +209,12 @@ static guint glade_widget_signals[LAST_SIGNAL] = { 0 };
 
 static GQuark glade_widget_name_quark = 0;
 
-G_DEFINE_TYPE (GladeWidget, glade_widget, G_TYPE_INITIALLY_UNOWNED)
+static void glade_widget_drag_init (GladeDragInterface *iface);
+
+G_DEFINE_TYPE_WITH_CODE (GladeWidget, glade_widget, G_TYPE_INITIALLY_UNOWNED,
+                         G_IMPLEMENT_INTERFACE (GLADE_TYPE_DRAG, 
+                                                glade_widget_drag_init))
+
 /*******************************************************************************
                            GladeWidget class methods
  *******************************************************************************/
@@ -1119,6 +1130,9 @@ glade_widget_set_real_property (GObject * object,
     case PROP_COMPOSITE:
         glade_widget_set_is_composite (widget, g_value_get_boolean (value));
 	break;
+    case PROP_DRAG_DEST:
+        glade_widget_set_drag_dest (widget, g_value_get_boolean (value));
+	break;
       default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -1178,6 +1192,9 @@ glade_widget_get_real_property (GObject * object,
       case PROP_COMPOSITE:
         g_value_set_boolean (value, glade_widget_get_is_composite (widget));
 	break;
+      case PROP_DRAG_DEST:
+        g_value_set_boolean (value, glade_widget_get_drag_dest (widget));
+	break;
       default:
         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
         break;
@@ -1213,6 +1230,109 @@ glade_widget_init (GladeWidget * widget)
   /* Initial invalid values */
   widget->priv->width = -1;
   widget->priv->height = -1;
+
+  widget->priv->drag_dest = FALSE;
+}
+
+static gboolean
+glade_widget_drag_can_drag (GladeDrag *source)
+{
+  GladeWidget *widget = GLADE_WIDGET (source);
+
+  return widget->priv->internal == NULL;
+}
+
+static gboolean
+glade_widget_drag_can_drop (GladeDrag *dest, GObject *data)
+{
+  if (GLADE_IS_WIDGET_ADAPTOR (data))
+    {
+      GType otype = glade_widget_adaptor_get_object_type (GLADE_WIDGET_ADAPTOR (data));
+
+      if (g_type_is_a (otype, GTK_TYPE_WIDGET) && !GWA_IS_TOPLEVEL (data))
+        return TRUE;
+    }
+  else
+    {
+      GladeWidget *new_child, *parent = GLADE_WIDGET (dest);
+      GObject *object = glade_widget_get_object (parent);
+
+      if (object == data)
+        return FALSE;
+        
+      if (GTK_IS_WIDGET (data) && GTK_IS_WIDGET (object) &&
+          gtk_widget_is_ancestor (GTK_WIDGET (data), GTK_WIDGET (object)))
+        return FALSE;
+
+      if ((new_child = glade_widget_get_from_gobject (data)) &&
+          (!glade_widget_add_verify (parent, new_child, FALSE) ||
+           glade_widget_placeholder_relation (parent, new_child)))
+        return FALSE;
+
+      return TRUE;
+    }
+
+  return FALSE;
+}
+
+static gboolean
+glade_widget_drag_drop (GladeDrag *dest, GObject *data)
+{
+  GladeWidget *gsource;
+
+  if (!data)
+    return FALSE;
+
+  if (GLADE_IS_WIDGET_ADAPTOR (data))
+    {
+      GladeWidget *parent = GLADE_WIDGET (dest);
+
+      glade_command_create (GLADE_WIDGET_ADAPTOR (data), parent, NULL, 
+                            glade_widget_get_project (parent));
+      return TRUE;
+    }
+  else if ((gsource = glade_widget_get_from_gobject (data)))
+    {
+      GladeWidget *parent = GLADE_WIDGET (dest);
+      GList widgets = {gsource, NULL, NULL};
+
+      /* Check for recursive paste */
+      if (parent != gsource)
+        {
+          glade_command_dnd (&widgets, parent, NULL);
+          return TRUE;
+        }
+    }
+
+  return FALSE;
+}
+
+static void
+glade_widget_drag_highlight (GladeDrag *drag, gboolean highlight)
+{
+  GObject *target = glade_widget_get_object (GLADE_WIDGET (drag));
+  GladeWidgetPrivate *priv = GLADE_WIDGET (drag)->priv;
+
+  if (highlight == priv->drag_highlight || !GTK_IS_WIDGET (target))
+    return;
+
+  priv->drag_highlight = highlight;
+    
+  g_signal_handlers_disconnect_by_func (target, _glade_dnd_highlight_draw, NULL);
+  
+  if (highlight)
+    g_signal_connect_after (target, "draw", G_CALLBACK (_glade_dnd_highlight_draw), NULL);
+
+  gtk_widget_queue_draw (GTK_WIDGET (target));
+}
+
+static void
+glade_widget_drag_init (GladeDragInterface *iface)
+{
+  iface->can_drag = glade_widget_drag_can_drag;
+  iface->can_drop = glade_widget_drag_can_drop;
+  iface->drop = glade_widget_drag_drop;
+  iface->highlight = glade_widget_drag_highlight;
 }
 
 static void
@@ -1337,6 +1457,11 @@ glade_widget_class_init (GladeWidgetClass * klass)
   properties[PROP_COMPOSITE] =
        g_param_spec_boolean ("composite", _("Composite"),
                             _("Whether this widget is the template for a composite widget"),
+                            FALSE, G_PARAM_READWRITE);
+  
+  properties[PROP_DRAG_DEST] =
+       g_param_spec_boolean ("drag-dest", _("Drag Destination"),
+                            _("Whether this widget is drag destination"),
                             FALSE, G_PARAM_READWRITE);
 
   /* Install all properties */
@@ -2640,6 +2765,44 @@ glade_widget_get_is_composite (GladeWidget *widget)
   g_return_val_if_fail (GLADE_IS_WIDGET (widget), FALSE);
 
   return widget->priv->composite;
+}
+
+/**
+ * glade_widget_set_drag_dest:
+ * @widget: a #GladeWidget
+ * @drag_dest: whether @widget should be a drag destination
+ *
+ * Set's this widget to be drag destination.
+ */
+void
+glade_widget_set_drag_dest (GladeWidget *widget,
+                            gboolean     drag_dest)
+{
+  g_return_if_fail (GLADE_IS_WIDGET (widget));
+
+  drag_dest = !!drag_dest;
+
+  if (widget->priv->drag_dest != drag_dest)
+    {
+      widget->priv->drag_dest = drag_dest;
+      g_object_notify_by_pspec (G_OBJECT (widget), properties[PROP_DRAG_DEST]);
+    }
+}
+
+/**
+ * glade_widget_get_drag_dest:
+ * @widget: a #GladeWidget
+ *
+ * Checks if @widget is a drag destination.
+ *
+ * Returns: whether @widget is a drag destination.
+ */
+gboolean
+glade_widget_get_drag_dest (GladeWidget *widget)
+{
+  g_return_val_if_fail (GLADE_IS_WIDGET (widget), FALSE);
+
+  return widget->priv->drag_dest;
 }
 
 /**

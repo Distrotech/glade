@@ -109,6 +109,10 @@ void
 glade_gtk_fixed_layout_post_create (GladeWidgetAdaptor * adaptor,
                                     GObject * object, GladeCreateReason reason)
 {
+  GladeWidget *widget = glade_widget_get_from_gobject (object);
+
+  glade_widget_set_drag_dest (widget, TRUE);
+  
   /* Set a minimun size so you can actually see it if you added to a box */
   gtk_widget_set_size_request (GTK_WIDGET (object), 32, 32);
 

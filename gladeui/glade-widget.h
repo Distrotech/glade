@@ -401,6 +401,11 @@ GtkTreeModel           *glade_widget_get_signal_model       (GladeWidget      *w
 GladeWidget            *glade_widget_find_child             (GladeWidget *widget,
                                                              const gchar *name);
 
+void                    glade_widget_set_drag_dest          (GladeWidget *widget,
+                                                             gboolean     drag_dest);
+
+gboolean                glade_widget_get_drag_dest          (GladeWidget *widget);
+
 G_END_DECLS
 
 #endif /* __GLADE_WIDGET_H__ */

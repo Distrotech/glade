@@ -110,7 +110,6 @@ struct _GladeDesignLayoutPrivate
 
   /* Drag & Drop */
   GtkWidget *drag_source;
-  GtkWidget *drag_icon;
   gint drag_x, drag_y;
 
   /* Properties */
@@ -382,9 +381,9 @@ glade_design_layout_motion_notify_event (GtkWidget *widget, GdkEventMotion *ev)
       static GtkTargetList *target = NULL;
 
       if (target == NULL)
-        target = gtk_target_list_new (_glade_design_layout_get_dnd_target (), 1);
+        target = gtk_target_list_new (_glade_dnd_get_target (), 1);
 
-      gtk_drag_begin (widget, target, GDK_ACTION_COPY, 1, (GdkEvent*)ev);
+      gtk_drag_begin (widget, target, 0, 1, (GdkEvent*)ev);
       return TRUE;
     }
 
@@ -1945,121 +1944,24 @@ glade_design_layout_finalize (GObject *object)
   G_OBJECT_CLASS (glade_design_layout_parent_class)->finalize (object);
 }
 
-static gboolean
-on_drag_icon_draw (GtkWidget *widget, cairo_t *cr)
-{
-  GtkStyleContext *context = gtk_widget_get_style_context (widget);
-  cairo_pattern_t *gradient;
-  GtkAllocation alloc;
-  gint x, y, w, h;
-  gdouble h2;
-  GdkRGBA bg;
-
-  /* Not needed acording to GtkWidget:draw documentation
-   * But seems like there is a bug when used as a drag_icon that makes the
-   * cairo translation used here persist when drawind children.
-   */
-  cairo_save (cr);
-
-  /* Clear BG */
-  cairo_set_operator (cr, CAIRO_OPERATOR_CLEAR);
-  cairo_paint (cr);
-  cairo_set_operator (cr, CAIRO_OPERATOR_OVER);
-  
-  gtk_widget_get_allocation (widget, &alloc);
-  x = alloc.x;
-  y = alloc.y;
-  w = alloc.width;
-  h = alloc.height;
-  h2 = h/2.0;
-
-  gtk_style_context_get_background_color (context, GTK_STATE_NORMAL, &bg);
-
-  gradient = cairo_pattern_create_linear (x, y, x, y+h);
-  cairo_pattern_add_color_stop_rgba (gradient, 0, bg.red, bg.green, bg.blue, 0);
-  cairo_pattern_add_color_stop_rgba (gradient, .5, bg.red, bg.green, bg.blue, .8);
-  cairo_pattern_add_color_stop_rgba (gradient, 1, bg.red, bg.green, bg.blue, 0);
-
-  cairo_set_source (cr, gradient);
-  cairo_rectangle (cr, x+h2, y, w-h, h);
-  cairo_fill (cr);
-  cairo_pattern_destroy (gradient);
-
-  gradient = cairo_pattern_create_radial (x+h2, y+h2, 0, x+h2, y+h2, h2);
-  cairo_pattern_add_color_stop_rgba (gradient, 0, bg.red, bg.green, bg.blue, .8);
-  cairo_pattern_add_color_stop_rgba (gradient, 1, bg.red, bg.green, bg.blue, 0);
-
-  cairo_set_source (cr, gradient);
-  cairo_rectangle (cr, x, y, h2, h);
-  cairo_fill (cr);
-
-  cairo_translate (cr, w-h, 0);
-  cairo_set_source (cr, gradient);
-  cairo_rectangle (cr, x+h2, y, h2, h);
-  cairo_fill (cr);
-  
-  cairo_pattern_destroy (gradient);
-  cairo_restore (cr);
-
-  return FALSE;
-}
-
-GtkWidget *
-_glade_design_layout_dnd_icon_widget_new (GdkDragContext *context,
-                                          const gchar *icon_name,
-                                          const gchar *description)
-{
-  GtkWidget *window, *box, *label, *icon;
-  GdkScreen *screen;
-  GdkVisual *visual;
-
-  screen = gdk_window_get_screen (gdk_drag_context_get_source_window (context));
-  visual = gdk_screen_get_rgba_visual (screen);
-  window = gtk_window_new (GTK_WINDOW_POPUP);
-  
-  gtk_window_set_type_hint (GTK_WINDOW (window), GDK_WINDOW_TYPE_HINT_DND);
-  gtk_window_set_screen (GTK_WINDOW (window), screen);
-  gtk_widget_set_visual (window, visual);
-
-  box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 4);
-  gtk_container_set_border_width (GTK_CONTAINER (box), 12);
-
-  icon = gtk_image_new_from_icon_name (icon_name, GTK_ICON_SIZE_BUTTON);
-  gtk_widget_set_opacity (icon, .8);
-  
-  label = gtk_label_new (description);
-
-  gtk_box_pack_start (GTK_BOX (box), icon, FALSE, TRUE, 0);
-  gtk_box_pack_start (GTK_BOX (box), label, FALSE, TRUE, 0);
-
-  gtk_widget_show_all (box);
-  gtk_container_add (GTK_CONTAINER (window), box);
-
-  gtk_widget_set_app_paintable (window, TRUE);
-  g_signal_connect (window, "draw", G_CALLBACK (on_drag_icon_draw), NULL);
-
-  return window;
-}
-
 static void
 glade_design_layout_drag_begin (GtkWidget *widget, GdkDragContext *context)
 {
   GladeDesignLayoutPrivate *priv = GLADE_DESIGN_LAYOUT_PRIVATE (widget);
   GladeWidgetAdaptor *adaptor;
   GladeWidget *gwidget;
-  const gchar *icon_name;
   gchar *description;
 
   gwidget = glade_widget_get_from_gobject (priv->drag_source);
   adaptor = glade_widget_get_adaptor (gwidget);
-  icon_name = glade_widget_adaptor_get_icon_name (adaptor);
   description = g_strdup_printf ("%s [%s]",
                                  glade_widget_adaptor_get_name (adaptor),
                                  glade_widget_get_name (gwidget));
 
-  priv->drag_icon = _glade_design_layout_dnd_icon_widget_new (context, icon_name, description);
-  g_object_ref_sink (priv->drag_icon);
-  gtk_drag_set_icon_widget (context, priv->drag_icon, 0, 0);
+  _glade_dnd_set_icon_widget (context,
+                              glade_widget_adaptor_get_icon_name (adaptor),
+                              description);
+  
   g_free (description);
 }
 
@@ -2071,25 +1973,13 @@ glade_design_layout_drag_data_get (GtkWidget        *widget,
                                    guint             time)
 {
   GladeDesignLayoutPrivate *priv = GLADE_DESIGN_LAYOUT_PRIVATE (widget);
-
-  if (priv->drag_source)
-    {
-      static GdkAtom type = 0;
-
-      if (!type)
-        type = gdk_atom_intern_static_string (GDL_DND_TARGET_WIDGET);
-
-      gtk_selection_data_set (data, type, sizeof (gpointer),
-                              (const guchar *)&priv->drag_source, sizeof (gpointer));
-    }
+  _glade_dnd_set_data (data, G_OBJECT (priv->drag_source));
 }
 
 static void
 glade_design_layout_drag_end (GtkWidget *widget, GdkDragContext *context)
 {
   GladeDesignLayoutPrivate *priv = GLADE_DESIGN_LAYOUT_PRIVATE (widget);
-
-  g_clear_object (&priv->drag_icon);
   priv->drag_source = NULL;
 }
 
@@ -2278,13 +2168,6 @@ _glade_design_layout_get_colors (GtkStyleContext *context,
   c1->blue += off;
 }
 
-GtkTargetEntry *
-_glade_design_layout_get_dnd_target (void)
-{
-  static GtkTargetEntry target = {GDL_DND_TARGET_WIDGET, GTK_TARGET_SAME_APP, GDL_DND_INFO_WIDGET};
-  return &target;
-}
-
 void
 _glade_design_layout_get_hot_point (GladeDesignLayout *layout,
                                     gint *x,
@@ -2353,7 +2236,8 @@ gdl_drag_source_check (GladeDesignLayout *layout,
       GObject *source;
 
       if (gwidget && (source = glade_widget_get_object (gwidget)) &&
-          !(event->button.state & GDK_SHIFT_MASK))
+          !(event->button.state & GDK_SHIFT_MASK) &&
+          glade_drag_can_drag (GLADE_DRAG (gwidget)))
         {
           priv->drag_source = GTK_WIDGET (source);
 
@@ -2370,6 +2254,12 @@ gdl_drag_source_check (GladeDesignLayout *layout,
     {
       priv->drag_source = NULL;
     }
+}
+
+GladeWidget *
+_glade_design_layout_get_child (GladeDesignLayout *layout)
+{
+  return layout->priv->gchild;
 }
 
 /*
