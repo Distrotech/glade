@@ -108,6 +108,14 @@ glade_preview_window_key_press_event (GtkWidget *widget, GdkEventKey *event)
       case GDK_KEY_F8:
         extension = priv->extension ? priv->extension : "png";
       break;
+      case GDK_KEY_F11:
+        if (gdk_window_get_state (gtk_widget_get_window (widget)) & GDK_WINDOW_STATE_FULLSCREEN)
+          gtk_window_unfullscreen (GTK_WINDOW (widget));
+        else
+          gtk_window_fullscreen (GTK_WINDOW (widget));
+
+        return TRUE;
+      break;
       default:
         return FALSE;
       break;
