@@ -480,8 +480,13 @@ glade_preview_window_screenshot (GladePreviewWindow *window,
     {
       GdkPixbuf *pix = gdk_pixbuf_get_from_window (gdkwindow, 0, 0, w, h);
       const gchar *ext = glade_preview_get_extension (filename);
+      GError *error = NULL;
       
-      gdk_pixbuf_save (pix, filename, ext ? ext : "png", NULL, NULL);
+      if (gdk_pixbuf_save (pix, filename, ext ? ext : "png", &error, NULL))
+        {
+          g_warning ("Could not save screenshot to %s because %s", filename, error->message);
+          g_error_free (error);
+        }
 
       g_object_unref (pix);
     }
@@ -544,4 +549,6 @@ glade_preview_window_slideshow_save (GladePreviewWindow *window,
       cairo_destroy (cr);
       cairo_surface_destroy(surface);
     }
+  else
+    g_warning ("Could not save slideshow to %s", filename);
 }
