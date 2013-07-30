@@ -436,12 +436,12 @@ main (int argc, char **argv)
           GSList *l, *objects = gtk_builder_get_objects (builder);
           GtkStack *stack = GTK_STACK (gtk_stack_new ());
 
-          objects = g_slist_sort (objects, objects_cmp_func);
-          gtk_stack_set_transition_type (stack, GTK_STACK_TRANSITION_TYPE_CROSSFADE);
-          
+          /* Add Page up and Page down key binding */
           g_signal_connect (app->window, "key-press-event",
                             G_CALLBACK (glade_previewer_stack_key_press_event),
                             stack);
+
+          objects = g_slist_sort (objects, objects_cmp_func);
 
           for (l = objects; l; l = g_slist_next (l))
             {
@@ -460,6 +460,16 @@ main (int argc, char **argv)
 
           glade_preview_window_set_widget (app->window, GTK_WIDGET (stack));
           gtk_widget_show (GTK_WIDGET (stack));
+          
+          if (screenshot_file_name)
+            glade_preview_window_slideshow_save (app->window, screenshot_file_name);
+          else
+            {
+              gtk_stack_set_transition_type (stack, GTK_STACK_TRANSITION_TYPE_CROSSFADE);
+
+              gtk_main ();
+            }
+
           g_slist_free (objects);
         }
       else
@@ -467,12 +477,12 @@ main (int argc, char **argv)
           GtkWidget *widget = get_toplevel (builder, toplevel_name);
           glade_preview_window_set_widget (app->window, widget);
           gtk_widget_show (widget);
-        }
 
-      if (screenshot_file_name)
-        glade_preview_window_screenshot (app->window, TRUE, screenshot_file_name);
-      else
-        gtk_main ();
+          if (screenshot_file_name)
+            glade_preview_window_screenshot (app->window, TRUE, screenshot_file_name);
+          else
+            gtk_main ();
+        }
 
       g_object_unref (builder);
     }
