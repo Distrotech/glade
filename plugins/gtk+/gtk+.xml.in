@@ -3243,6 +3243,14 @@
         </packing-properties>
       </glade-widget-class>
       
+      <glade-widget-class name="GtkPopover" generic-name="popover" _title="Popover">
+        <constructor-function>glade_gtk_popover_constructor</constructor-function>
+        <properties>
+          <property id="relative-to" ignore="True"/>
+          <property id="position" ignore="True"/>
+        </properties>
+      </glade-widget-class>
+
       <glade-widget-class name="GtkLinkButton" generic-name="linkbutton" _title="Link Button">
         <properties>
           <!-- The pspec of this prop says that the default is http://www.gtk.org but gtk_link_button_init() does
@@ -5285,6 +5293,7 @@
       <glade-widget-class-ref name="GtkDrawingArea"/>
       
       <glade-widget-class-ref name="GtkInfoBar"/>
+      <glade-widget-class-ref name="GtkPopover"/>
     </glade-widget-group>
     
     <glade-widget-group name="gtk-composite" _title="Composite Widgets">
